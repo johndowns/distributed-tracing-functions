@@ -1,0 +1,166 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "functionAppAName": {
+            "type": "string",
+            "defaultValue": "[concat(uniqueString(resourceGroup().id), 'a')]",
+            "metadata": {
+                "description": "The name of the Azure Functions app to create for function app A. The app name must be globally unique."
+            }
+        },
+        "functionAppBName": {
+            "type": "string",
+            "defaultValue": "[concat(uniqueString(resourceGroup().id), 'b')]",
+            "metadata": {
+                "description": "The name of the Azure Functions app to create for function app B. The app name must be globally unique."
+            }
+        },
+        "storageAccountAName": {
+            "type": "string",
+            "defaultValue": "[concat(uniqueString(resourceGroup().id), 'a')]",
+            "metadata": {
+                "description": "The name of the Azure Storage account to create, which will be used for storing metadata for the Azure Functions app A. App name must be globally unique."
+            }
+        },
+        "storageAccountBName": {
+            "type": "string",
+            "defaultValue": "[concat(uniqueString(resourceGroup().id), 'b')]",
+            "metadata": {
+                "description": "The name of the Azure Storage account to create, which will be used for storing metadata for the Azure Functions app B. App name must be globally unique."
+            }
+        },
+        "location": {
+            "type": "string",
+            "defaultValue": "[resourceGroup().location]",
+            "metadata": {
+                "description": "The location of all resources."
+            }
+        },
+        "storageAccountType": {
+            "type": "string",
+            "defaultValue": "Standard_LRS",
+            "metadata": {
+                "description": "The type of Azure Storage account to create for the Azure Functions host to use."
+            }
+        }
+    },
+    "variables": {
+        "applicationInsightsName": "DistributedTracingFunctionsAI",
+
+        "storageAccountAId": "[resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccountAName'))]",
+        "storageAccountBId": "[resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccountBName'))]"
+    },
+    "resources": [
+        {
+            "name": "[variables('applicationInsightsName')]",
+            "type": "Microsoft.Insights/components",
+            "apiVersion": "2015-05-01",
+            "location": "[parameters('location')]",
+            "kind": "web",
+            "properties": {
+                "Application_Type": "web",
+                "ApplicationId": "[variables('applicationInsightsName')]"
+            }
+        },
+
+        {
+            "type": "Microsoft.Storage/storageAccounts",
+            "name": "[parameters('storageAccountAName')]",
+            "apiVersion": "2019-04-01",
+            "location": "[parameters('location')]",
+            "kind": "StorageV2",
+            "sku": {
+                "name": "[parameters('storageAccountType')]"
+            }
+        },
+        {
+            "type": "Microsoft.Storage/storageAccounts",
+            "name": "[parameters('storageAccountBName')]",
+            "apiVersion": "2019-04-01",
+            "location": "[parameters('location')]",
+            "kind": "StorageV2",
+            "sku": {
+                "name": "[parameters('storageAccountType')]"
+            }
+        },
+
+        {
+            "name": "[parameters('functionAppAName')]",
+            "type": "Microsoft.Web/sites",
+            "apiVersion": "2015-08-01",
+            "location": "[parameters('location')]",
+            "kind": "functionapp",
+            "properties": {
+                "siteConfig": {
+                    "appSettings": [
+                        {
+                            "name": "AzureWebJobsStorage",
+                            "value": "[concat('DefaultEndpointsProtocol=https;AccountName=', parameters('storageAccountAName'), ';AccountKey=', listKeys(variables('storageAccountAId'),'2015-05-01-preview').key1)]"
+                        },
+                        {
+                            "name": "FUNCTIONS_EXTENSION_VERSION",
+                            "value": "~3"
+                        },
+                        {
+                            "name": "APPINSIGHTS_INSTRUMENTATIONKEY",
+                            "value": "[reference(resourceId('Microsoft.Insights/components', variables('applicationInsightsName')), '2015-05-01').instrumentationKey]"
+                        },
+                        {
+                            "name": "FunctionBUrl",
+                            "value": "[concat('https://', reference(resourceId('Microsoft.Web/sites', parameters('functionAppBName')), '2015-08-01').defaultHostName, '/api/FunctionB')]"
+                        }
+                    ]
+                }
+            },
+            "dependsOn": [
+                "[resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccountAName'))]",
+                "[resourceId('Microsoft.Insights/components', variables('applicationInsightsName'))]",
+                "[resourceId('Microsoft.Web/sites', parameters('functionAppBName'))]"
+            ]
+        },
+        {
+            "name": "[parameters('functionAppBName')]",
+            "type": "Microsoft.Web/sites",
+            "apiVersion": "2015-08-01",
+            "location": "[parameters('location')]",
+            "kind": "functionapp",
+            "properties": {
+                "siteConfig": {
+                    "appSettings": [
+                        {
+                            "name": "AzureWebJobsStorage",
+                            "value": "[concat('DefaultEndpointsProtocol=https;AccountName=', parameters('storageAccountBName'), ';AccountKey=', listKeys(variables('storageAccountBId'),'2015-05-01-preview').key1)]"
+                        },
+                        {
+                            "name": "FUNCTIONS_EXTENSION_VERSION",
+                            "value": "~3"
+                        },
+                        {
+                            "name": "APPINSIGHTS_INSTRUMENTATIONKEY",
+                            "value": "[reference(resourceId('Microsoft.Insights/components', variables('applicationInsightsName')), '2015-05-01').instrumentationKey]"
+                        }
+                    ]
+                }
+            },
+            "dependsOn": [
+                "[resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccountBName'))]",
+                "[resourceId('Microsoft.Insights/components', variables('applicationInsightsName'))]"
+            ]
+        }
+    ],
+    "outputs": {
+        "functionsAppAName": {
+            "type": "string",
+            "value": "[parameters('functionAppAName')]"
+        },
+        "functionAUrl": {
+            "type": "string",
+            "value": "[concat('https://', reference(resourceId('Microsoft.Web/sites', parameters('functionAppAName')), '2015-08-01').defaultHostName, '/api/FunctionA')]"
+        },
+        "functionsAppBName": {
+            "type": "string",
+            "value": "[parameters('functionAppBName')]"
+        }
+    }
+}
