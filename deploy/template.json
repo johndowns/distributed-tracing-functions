@@ -30,6 +30,13 @@
                 "description": "The name of the Azure Storage account to create, which will be used for storing metadata for the Azure Functions app B. App name must be globally unique."
             }
         },
+        "cosmosDBAccountName": {
+            "type": "string",
+            "defaultValue": "[uniqueString(resourceGroup().id)]",
+            "metadata": {
+                "description": "The name of the Cosmos DB account to create. Cosmos DB account name must be globally unique."
+            }
+        },
         "location": {
             "type": "string",
             "defaultValue": "[resourceGroup().location]",
@@ -47,9 +54,10 @@
     },
     "variables": {
         "applicationInsightsName": "DistributedTracingFunctionsAI",
-
         "storageAccountAId": "[resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccountAName'))]",
-        "storageAccountBId": "[resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccountBName'))]"
+        "storageAccountBId": "[resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccountBName'))]",
+        "cosmosDBDatabaseName": "MyDatabase",
+        "cosmosDBContainerName": "MyContainer"
     },
     "resources": [
         {
@@ -63,7 +71,6 @@
                 "ApplicationId": "[variables('applicationInsightsName')]"
             }
         },
-
         {
             "type": "Microsoft.Storage/storageAccounts",
             "name": "[parameters('storageAccountAName')]",
@@ -84,7 +91,6 @@
                 "name": "[parameters('storageAccountType')]"
             }
         },
-
         {
             "name": "[parameters('functionAppAName')]",
             "type": "Microsoft.Web/sites",
@@ -109,6 +115,10 @@
                         {
                             "name": "FunctionBUrl",
                             "value": "[concat('https://', reference(resourceId('Microsoft.Web/sites', parameters('functionAppBName')), '2015-08-01').defaultHostName, '/api/FunctionB')]"
+                        },
+                        {
+                            "name": "ExternalApiUrl",
+                            "value": "http://dummy.restapiexample.com/api/v1/employee/1"
                         }
                     ]
                 }

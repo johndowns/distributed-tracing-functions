@@ -21,11 +21,15 @@ namespace DistributedTracing.AppA
         {
             log.LogInformation("C# HTTP trigger function processed a request.");
 
-            var outboundRequestCount = Random.Next(2, 5);
-            for (int i = 1; i <= outboundRequestCount; i++)
+            log.LogInformation($"Making outbound request to external API.");
+            var response = await HttpClient.GetAsync(Environment.GetEnvironmentVariable("ExternalApiUrl"));
+            log.LogInformation($"Received response status code {(int)response.StatusCode}.");
+
+            var outboundFunctionBRequestCount = Random.Next(2, 5);
+            for (int i = 1; i <= outboundFunctionBRequestCount; i++)
             {
-                log.LogInformation($"Making outbound request {i} of {outboundRequestCount}.");
-                var response = await HttpClient.GetAsync(Environment.GetEnvironmentVariable("FunctionBUrl"));
+                log.LogInformation($"Making outbound request to function B: request {i} of {outboundFunctionBRequestCount}.");
+                response = await HttpClient.GetAsync(Environment.GetEnvironmentVariable("FunctionBUrl"));
                 log.LogInformation($"Received response status code {(int)response.StatusCode}.");
             }
 
